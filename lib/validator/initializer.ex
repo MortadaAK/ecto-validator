@@ -11,6 +11,19 @@ defmodule EctoValidator.Validator.Initializer do
       %Information{},
       &build_group_types/2
     )
+    |> validate_paths()
+  end
+
+  defp validate_paths(information) do
+    information.dependencies
+    |> expand_dependencies()
+    |> case do
+      {:error, name, fields} ->
+        {:error, "#{name} has cycle dependency on #{Enum.join(fields, ", ")}"}
+
+      _ ->
+        {:ok, information}
+    end
   end
 
   defp build_group_types(group, information) do
@@ -59,7 +72,11 @@ defmodule EctoValidator.Validator.Initializer do
       default: default
     }
 
-    token = build_field_types(field, token)
+    token =
+      field
+      |> build_field_types(token)
+      |> extract_dependencies(field)
+
     {token, [field | fields]}
   end
 
@@ -223,6 +240,54 @@ defmodule EctoValidator.Validator.Initializer do
       {_, result} when is_list(result) -> result
       {result, _} when is_list(result) -> result
       _ -> nil
+    end
+  end
+
+  defp extract_dependencies(information, %Field{name: name, operation: nil}),
+    do: %Information{
+      information
+      | dependencies: Map.put(information.dependencies, name, [])
+    }
+
+  defp extract_dependencies(
+         information,
+         %Field{name: name, operation: operation}
+       ) do
+    dependencies =
+      operation
+      |> extract_dependencies()
+      |> Enum.uniq()
+
+    %Information{
+      information
+      | dependencies: Map.put(information.dependencies, name, dependencies)
+    }
+  end
+
+  defp extract_dependencies({_, left, right}),
+    do: Enum.concat(extract_dependencies(left), extract_dependencies(right))
+
+  defp extract_dependencies({:field, field}), do: [field]
+  defp extract_dependencies({_, field}), do: extract_dependencies(field)
+  defp extract_dependencies(_), do: []
+
+  defp expand_dependencies(dependencies) do
+    dependencies |> Enum.to_list() |> expand_dependencies([], [])
+  end
+
+  defp expand_dependencies([], resolved, []), do: {:ok, resolved}
+
+  defp expand_dependencies([], resolved, [{name, dependencies} | _]),
+    do: {:error, name, dependencies -- resolved}
+
+  defp expand_dependencies([{name, []} | rem], resolved, skipped),
+    do: expand_dependencies(Enum.concat(rem, skipped), [name | resolved], [])
+
+  defp expand_dependencies([{name, dependencies} | rem], resolved, skipped) do
+    if Enum.all?(dependencies, &(&1 in resolved)) do
+      expand_dependencies(Enum.concat(rem, skipped), resolved, [])
+    else
+      expand_dependencies(rem, resolved, [{name, dependencies} | skipped])
     end
   end
 end

@@ -1160,7 +1160,12 @@ defmodule EctoValidatorTest do
           field(:field1, :integer, validations: :required, operation: :field2 - :field3)
           field(:field2, :integer, validations: :required)
           field(:field3, :integer, validations: :required)
-          field(:field4, :decimal, validations: :required, operation: :field5 - :field6 - 10)
+
+          field(:field4, :decimal,
+            validations: :required,
+            operation: :field5 - :field6 - 10
+          )
+
           field(:field5, :decimal, validations: :required)
           field(:field6, :decimal, validations: :required)
         end
@@ -1527,6 +1532,38 @@ defmodule EctoValidatorTest do
                  field1: 2,
                  field2: 2
                })
+    end
+
+    test "should raise an error for cycled referencing (simple)" do
+      assert_raise(RuntimeError, "field2 has cycle dependency on field1", fn ->
+        module = String.to_atom("Test#{random()}")
+
+        defmodule module do
+          use EctoValidator
+
+          schema_with_validations "table_name" do
+            field(:field1, :integer, operation: :field2 + 1)
+            field(:field2, :integer, operation: :field1 + 1)
+          end
+        end
+      end)
+    end
+
+    test "should raise an error for cycled referencing (deep)" do
+      assert_raise(RuntimeError, "field4 has cycle dependency on field1", fn ->
+        module = String.to_atom("Test#{random()}")
+
+        defmodule module do
+          use EctoValidator
+
+          schema_with_validations "table_name" do
+            field(:field1, :integer, operation: :field2 + 1)
+            field(:field2, :integer, operation: :field3 + 1)
+            field(:field3, :integer, operation: :field4 + 1)
+            field(:field4, :integer, operation: :field1 + 1)
+          end
+        end
+      end)
     end
   end
 

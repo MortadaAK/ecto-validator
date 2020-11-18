@@ -1,5 +1,5 @@
 defmodule EctoValidator do
-  alias __MODULE__.{Parser, Validator, Validator.Initializer}
+  alias __MODULE__.{Parser, Validator.Initializer}
 
   defmacro __using__(_) do
     quote do
@@ -13,10 +13,10 @@ defmodule EctoValidator do
       block
       |> Parser.parse_groups(__CALLER__)
 
-    rebuild_ast(table_name, groups)
+    rebuild_ast(table_name, groups, __CALLER__)
   end
 
-  defp rebuild_ast(table_name, groups) do
+  defp rebuild_ast(table_name, groups, _caller) do
     block =
       groups
       |> Enum.flat_map(& &1.fields)
@@ -28,7 +28,14 @@ defmodule EctoValidator do
         }
       end)
 
-    groups = groups |> Initializer.build_types() |> Macro.escape()
+    groups =
+      case Initializer.build_types(groups) do
+        {:ok, types} ->
+          Macro.escape(types)
+
+        {:error, error} ->
+          raise error
+      end
 
     quote do
       @information unquote(groups)
