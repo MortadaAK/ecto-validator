@@ -7,7 +7,8 @@ defmodule EctoValidator.Information do
             assocs: %{},
             fields_to_casts: [],
             assocs_to_cast: [],
-            groups: []
+            groups: [],
+            dependencies: %{}
 
   @type t :: %__MODULE__{}
 end
