@@ -1,3 +1,4 @@
+![Elixir CI](https://github.com/MortadaAK/ecto-validator/workflows/Elixir%20CI/badge.svg)
 # EctoValidator
 
 `Ecto Validator` adds `validations` and `operations` to ecto schema.
